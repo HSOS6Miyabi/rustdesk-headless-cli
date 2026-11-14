@@ -28,6 +28,7 @@ jobs:
           python -m pytest -q -p no:cacheprovider tests/test_host_e2e.py tests/test_file_ops.py tests/test_cli.py tests/test_rendezvous.py tests/test_relay_e2e.py tests/test_cross_platform_api.py
       - name: Run PAM, public-mode and isolation tests
         run: |
+          if ! id oai >/dev/null 2>&1; then sudo useradd --create-home --shell /bin/sh oai; fi
           sudo env "PATH=$PATH" python -m pytest -q -p no:cacheprovider tests/test_auth.py tests/test_public_e2e.py
 
   build:
