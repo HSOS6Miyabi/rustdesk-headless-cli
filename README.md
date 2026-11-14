@@ -2,7 +2,7 @@
 
 RustDesk Headless 提供 Linux 无图形界面的远程终端与文件传输服务端，以及 Linux、macOS 和 Windows 命令行客户端。服务端使用 RustDesk 的标准消息格式，支持直接 TCP 连接和通过 hbbs/hbbr 建立中继连接。设计目标是兼容未经修改的 RustDesk 桌面客户端。实际 GUI 兼容性仍需进一步验证。
 
-项目提供私用模式和公用模式。私用模式直接使用服务进程所属账户的权限。公用模式通过 PAM 验证 Linux 账户，为验证成功的会话启动对应用户的独立进程。
+项目提供私用模式和公用模式。私用模式直接使用服务进程所属账户的权限，也可以以 root 运行，适合 OpenWrt 等仅提供 root 账户的设备。公用模式通过 PAM 验证 Linux 账户，为验证成功的会话启动对应用户的独立进程。
 
 ## 已实现的功能
 
@@ -22,9 +22,9 @@ RustDesk Headless 提供 Linux 无图形界面的远程终端与文件传输服�
 
 ## 安装条件
 
-- Linux 服务端需要 Linux 与 PAM（公用模式），私用模式使用普通系统账户运行。
+- Linux 服务端需要 Linux；公用模式需要 PAM，私用模式可以使用普通用户或 root 账户。OpenWrt 的私用模式无需 PAM。
 - 源码安装需要 Python 3.11 或更新版本，可以使用系统 `libsodium`、`libzstd` 动态库，或者安装 PyNaCl 和 zstandard。
-- GitHub Release 发布的 Linux 单文件可执行程序包含 Python 运行时及加密、压缩相关依赖。系统仍需安装并配置 PAM，才能使用公用模式。
+- GitHub Release 的通用 Linux 可执行文件使用 glibc 构建；OpenWrt 使用 musl libc，应安装专门发布的 OpenWrt 源码包和系统依赖。
 - Windows 和 macOS 发布单文件命令行客户端；这两个平台不运行 Linux PAM 服务端。
 
 在源码目录执行：
@@ -51,7 +51,42 @@ chmod 600 ~/.config/rdheadless/password
 python3 -m rdheadless host --config examples/private.toml
 ```
 
-连接时使用标准 RustDesk 密码。终端和文件操作都使用运行本程序的 Linux 账户，不会额外询问 PAM 密码。
+连接时使用标准 RustDesk 密码。终端和文件操作都使用运行本程序的 Linux 账户，不会额外询问 PAM 密码。服务以 root 运行时，远程终端和文件传输拥有 root 权限；请使用足够强且独立的连接密码，并限制允许访问的文件目录。
+
+## OpenWrt 安装与私用模式（root）
+
+OpenWrt 通常使用 BusyBox `ash`，且可能只有 root 账户。服务端可以直接以 root 运行私用模式，仍需通过 RustDesk 标准加密握手及连接密码验证。此模式不会读取 PAM 用户数据库，也无需在设备上创建其他用户。
+
+请从 GitHub Release 下载 `rdheadless-openwrt-source.tar.gz`，解压并执行：
+
+```sh
+tar -xzf rdheadless-openwrt-source.tar.gz
+cd rdheadless-openwrt
+sh openwrt/install.sh
+vi /etc/rdheadless/config.toml
+/etc/init.d/rdheadless enable
+/etc/init.d/rdheadless start
+```
+
+安装脚本会根据系统选择 `opkg` 或 `apk`，安装系统 Python 3、`python3-ctypes`、`libsodium` 与 `libzstd`。随后安装 Python 源码、`procd` 服务脚本，生成随机 RustDesk 设备 ID 和权限为 `0600` 的连接密码。重新安装会保留现有配置、身份文件和连接密码。请在启动前设置自己的 hbbs/hbbr 地址并开启设备注册：
+
+```toml
+enable_public_rendezvous = true
+rendezvous_server = "YOUR_HBBS_HOST:21116"
+relay_server = "YOUR_HBBR_HOST:21117"
+```
+
+连接密码保存在 `/etc/rdheadless/password`，可在路由器终端中查看，但请勿将其公布在聊天记录或命令行参数中。配置示例默认使用 `/bin/ash`、`login_shell = true`、`file_root = "/root"`，因此可以直接操作 root 家目录。若需要访问路由器的其他文件，可以按需修改 `file_root`，设置为 `/` 会允许 root 用户操作整个文件系统。建议保留文件目录限制。
+
+安装后使用以下命令查看状态：
+
+```sh
+/etc/init.d/rdheadless status
+logread -e rdheadless
+rdheadless identity --config /etc/rdheadless/config.toml
+```
+
+**兼容性范围：** OpenWrt 的安装包为与 CPU 架构无关的 Python 源码，使用该设备软件仓库提供的 Python 与 musl 兼容动态库。适用于提供 Python 3.11+、`python3-ctypes`、`libsodium`、`libzstd` 和 `/dev/ptmx` 的 OpenWrt 固件。当前 CI 在 OpenWrt x86-64 容器中验证真实 root 终端和文件传输；其他 CPU 架构使用相同源码，但仍需安装对应架构的软件包。通用 Linux 的 `rdheadless-linux-*.tar.gz` 不适用于 OpenWrt 的 musl 系统。
 
 ## 公用模式
 
@@ -119,7 +154,7 @@ rdheadless client hbbs.example.org:21116 \
 
 ## GitHub Actions 与版本发布
 
-推送代码到 `main` 分支后，GitHub Actions 自动执行私用模式与公用模式测试，随后分别构建 Linux x86-64、Linux ARM64、macOS x86-64、macOS ARM64、Windows x86-64 的单文件可执行程序。全部构建、可执行程序启动检查和 Linux 实际文件传输检查通过后，发布与 `pyproject.toml` 版本一致的 GitHub Release，并附上各平台归档文件及 SHA-256 校验文件。
+推送代码到 `main` 分支后，GitHub Actions 自动执行私用模式与公用模式测试，随后分别构建 Linux x86-64、Linux ARM64、macOS x86-64、macOS ARM64、Windows x86-64 的单文件可执行程序，并生成 OpenWrt 源码安装包。全部构建、可执行程序启动检查和 Linux 实际文件传输检查和 OpenWrt musl 环境下的 root 私用模式测试通过后，发布与 `pyproject.toml` 版本一致的 GitHub Release，并附上各平台归档文件及 SHA-256 校验文件。
 
 修改程序版本时，需要同步更新 `pyproject.toml` 与 `rdheadless/__init__.py`。已经发布的版本号不得重复使用。
 
@@ -146,7 +181,7 @@ tunnel_ports = [8080, 2222]
 
 ## 本地测试
 
-私用模式由普通账户执行：
+私用模式可以由普通账户执行；root 私用模式另有专门的连接、文件传输和终端测试：
 
 ```bash
 PYTHONPATH=.:tests python3 -m pytest -q -p no:cacheprovider \

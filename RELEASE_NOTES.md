@@ -1,13 +1,11 @@
-# RustDesk Headless CLI v0.3.0
+# RustDesk Headless CLI v0.3.1
 
-本版本提供 Linux 无图形界面的 RustDesk 被控端，以及 Linux、macOS 和 Windows 命令行客户端。
+该版本提供 Linux 私用模式 root 运行支持，以及适用于 OpenWrt 的源码安装包。
 
-- Linux 私用模式：使用运行服务的用户身份，提供终端、文件传输和受限制的端口转发。
-- Linux 公用模式：通过 PAM 验证 Linux 用户名和密码。官方文件传输界面可通过虚拟认证目录提交 PAM 登录信息，所有未认证操作均受到限制。
-- RustDesk 协议：兼容的加密连接和挑战响应、设备级稳定 salt、hbbs UDP 注册、hbbr TCP 中继协调。
-- CLI：通过设备 IP 地址直接连接，或经由 hbbs/hbbr 按设备 ID 建立 TCP 中继连接。
-- GitHub Actions：跨平台构建单文件可执行程序，运行测试和 Linux 打包程序联调，自动发布并附带 SHA-256 校验文件。
+- 私用模式可直接以 root 运行，终端和文件管理继承服务账户权限，仍要求连接密码。
+- 新增 OpenWrt `ash`、`procd` 服务安装脚本，自动安装所需系统依赖并保留现有配置。
+- 使用系统的 musl 兼容 `libsodium` 和 `libzstd`，不依赖 glibc 单文件程序。
+- 增加 root 用户终端、文件传输、认证失败及动态库加载测试。
+- 原有 Linux、macOS 和 Windows 命令行版本保持支持。
 
-**功能范围：** 当前版本尚不包含远程桌面、图形界面、WebRTC、UDP/KCP 打洞、WebSocket/WSS。公用模式的 PAM 服务端仅适用于 Linux。模拟联调已经通过，但尚未完成官方 GUI 和真实公网 hbbs/hbbr 联调。
-
-使用说明和安全注意事项请查阅仓库中的 README.md 与 SECURITY.md。
+使用前请阅读 README 的 OpenWrt 安装说明。root 私用模式获得设备的最高文件与终端权限，务必设置强连接密码，并限制可访问目录。

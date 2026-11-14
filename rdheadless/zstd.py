@@ -1,23 +1,20 @@
 """Bounded Zstandard decompression through system libzstd."""
 import ctypes as C
-from ctypes.util import find_library
+from .native import load_library
 
 try:
     import zstandard as _zstandard
 except ImportError:
     _zstandard = None
 
-name = find_library('zstd') if _zstandard is None else None
-if name:
-    lib = C.CDLL(name)
+lib = load_library('zstd', 'libzstd.so.1', 'libzstd.so') if _zstandard is None else None
+if lib:
     lib.ZSTD_getFrameContentSize.argtypes = [C.c_void_p, C.c_size_t]
     lib.ZSTD_getFrameContentSize.restype = C.c_ulonglong
     lib.ZSTD_decompress.argtypes = [C.c_void_p, C.c_size_t, C.c_void_p, C.c_size_t]
     lib.ZSTD_decompress.restype = C.c_size_t
     lib.ZSTD_isError.argtypes = [C.c_size_t]
     lib.ZSTD_isError.restype = C.c_uint
-else:
-    lib = None
 
 
 def decompress(data: bytes, max_size: int = 1024*1024) -> bytes:

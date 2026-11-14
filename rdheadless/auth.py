@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from ctypes import CDLL, Structure, CFUNCTYPE, POINTER, byref, c_int, c_void_p, c_char_p, c_size_t
-from ctypes.util import find_library
+from .native import load_library
 import ctypes
 import os
 import pwd
@@ -111,11 +111,12 @@ def pam_login(username: str, password: str, service: str = 'login') -> PAMSessio
         raise PAMError('missing or invalid system credentials')
     if not service or '/' in service or len(service) > 64:
         raise ValueError('invalid PAM service')
-    libname = find_library('pam')
-    if not libname:
+    lib = load_library('pam', 'libpam.so.0', 'libpam.so')
+    if lib is None:
         raise RuntimeError('PAM library is not available')
-    lib = CDLL(libname)
-    libc = CDLL(find_library('c'))
+    libc = load_library('c', 'libc.so.6', 'libc.so')
+    if libc is None:
+        raise RuntimeError('C runtime library is not available')
     libc.calloc.argtypes = [c_size_t, c_size_t]
     libc.calloc.restype = c_void_p
     libc.free.argtypes = [c_void_p]

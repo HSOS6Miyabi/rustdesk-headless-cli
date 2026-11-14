@@ -68,8 +68,6 @@ class Config:
             raise PermissionError('public mode requires a root service')
         if self.mode == 'private' and not self.password_file:
             raise ValueError('private mode requires password_file')
-        if self.mode == 'private' and os.geteuid() == 0:
-            raise PermissionError('private mode refuses root: use an unprivileged service account')
         if self.file_root and not os.path.isabs(self.file_root):
             raise ValueError('file_root must be an absolute path')
         if self.shell and not os.path.isabs(self.shell):

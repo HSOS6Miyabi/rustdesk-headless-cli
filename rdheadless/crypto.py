@@ -5,7 +5,7 @@ a RustDesk-compatible encrypted peer session has been established.
 """
 from __future__ import annotations
 import ctypes as C
-from ctypes.util import find_library
+from .native import load_library
 import hashlib
 import os
 from dataclasses import dataclass
@@ -19,10 +19,9 @@ except ImportError as exc:
 
 _lib = None
 if _nacl is None:
-    _libname = find_library('sodium')
-    if not _libname:
+    _lib = load_library('sodium', 'libsodium.so.23', 'libsodium.so')
+    if _lib is None:
         raise RuntimeError(f'libsodium or PyNaCl is required: {_nacl_import_error}')
-    _lib = C.CDLL(_libname)
     if _lib.sodium_init() < 0:
         raise RuntimeError('failed to initialize libsodium')
 

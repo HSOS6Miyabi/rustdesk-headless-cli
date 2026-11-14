@@ -35,7 +35,7 @@ jobs:
             parent="$(dirname "$parent")"
           done
           sudo -u oai env "PYTHONPATH=$GITHUB_WORKSPACE" python -c "import rdheadless.worker"
-          sudo env "PATH=$PATH" python -m pytest -q -p no:cacheprovider tests/test_auth.py tests/test_public_e2e.py
+          sudo env "PATH=$PATH" python -m pytest -q -p no:cacheprovider tests/test_auth.py tests/test_public_e2e.py tests/test_openwrt_private.py tests/test_openwrt_install.py
 
   build:
     name: Build ${{ matrix.target }}
@@ -107,9 +107,36 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+
+  openwrt:
+    name: Test OpenWrt and package source distribution
+    needs: [test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify OpenWrt musl installation and root terminal/file transfer
+        run: bash scripts/verify_openwrt.sh
+      - name: Package architecture-independent OpenWrt sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p staging/rdheadless-openwrt/rdheadless staging/rdheadless-openwrt/openwrt output
+          cp rdheadless/*.py staging/rdheadless-openwrt/rdheadless/
+          cp openwrt/*.sh openwrt/*.toml openwrt/*.init staging/rdheadless-openwrt/openwrt/
+          cp README.md SECURITY.md LICENSE NOTICE staging/rdheadless-openwrt/
+          tar -czf output/rdheadless-openwrt-source.tar.gz -C staging rdheadless-openwrt
+          tar -tzf output/rdheadless-openwrt-source.tar.gz | grep -q 'rdheadless-openwrt/openwrt/install.sh'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-openwrt
+          path: output/*.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
   publish:
     name: Publish GitHub release
-    needs: [build]
+    needs: [build, openwrt]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:

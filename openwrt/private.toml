@@ -1,0 +1,16 @@
+[server]
+mode = "private"
+device_id = "RDOpenWrtExample"
+identity_file = "/etc/rdheadless/identity.json"
+password_file = "/etc/rdheadless/password"
+listen_host = "127.0.0.1"
+listen_port = 21118
+shell = "/bin/ash"
+login_shell = true
+file_root = "/root"
+allow_tunnel = false
+tunnel_ports = []
+
+enable_public_rendezvous = false
+rendezvous_server = "hbbs.example.org:21116"
+relay_server = "hbbr.example.org:21117"

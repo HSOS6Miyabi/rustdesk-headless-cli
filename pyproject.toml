@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rdheadless"
-version = "0.3.0"
+version = "0.3.1"
 description = "RustDesk protocol terminal, file and controlled port forwarding host and CLI"
 requires-python = ">=3.11"
 license = "AGPL-3.0-only"
