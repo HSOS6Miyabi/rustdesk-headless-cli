@@ -10,16 +10,18 @@ import hashlib
 import os
 from dataclasses import dataclass
 
+_nacl_import_error = None
 try:
     from nacl import bindings as _nacl
-except ImportError:
+except ImportError as exc:
     _nacl = None
+    _nacl_import_error = exc
 
 _lib = None
 if _nacl is None:
     _libname = find_library('sodium')
     if not _libname:
-        raise RuntimeError('libsodium or PyNaCl is required')
+        raise RuntimeError(f'libsodium or PyNaCl is required: {_nacl_import_error}')
     _lib = C.CDLL(_libname)
     if _lib.sodium_init() < 0:
         raise RuntimeError('failed to initialize libsodium')

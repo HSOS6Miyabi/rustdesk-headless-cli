@@ -68,7 +68,7 @@ jobs:
         env:
           HOST: ${{ matrix.host }}
         run: |
-          ARGS=(--noconfirm --clean --onefile --console --name rdheadless --collect-all nacl --collect-all zstandard)
+          ARGS=(--noconfirm --clean --onefile --console --name rdheadless --collect-all nacl --collect-all cffi --hidden-import _cffi_backend --collect-all zstandard)
           if [[ "$HOST" == 'true' ]]; then
             ARGS+=(--hidden-import rdheadless.worker --hidden-import rdheadless.exec_shell)
           fi
