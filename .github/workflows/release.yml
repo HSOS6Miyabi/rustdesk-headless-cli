@@ -29,6 +29,12 @@ jobs:
       - name: Run PAM, public-mode and isolation tests
         run: |
           if ! id oai >/dev/null 2>&1; then sudo useradd --create-home --shell /bin/sh oai; fi
+          parent="$GITHUB_WORKSPACE"
+          while [ "$parent" != / ]; do
+            sudo chmod o+x "$parent"
+            parent="$(dirname "$parent")"
+          done
+          sudo -u oai env "PYTHONPATH=$GITHUB_WORKSPACE" python -c "import rdheadless.worker"
           sudo env "PATH=$PATH" python -m pytest -q -p no:cacheprovider tests/test_auth.py tests/test_public_e2e.py
 
   build:
