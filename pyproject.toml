@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rdheadless"
+version = "0.3.0"
+description = "RustDesk protocol terminal, file and controlled port forwarding host and CLI"
+requires-python = ">=3.11"
+license = "AGPL-3.0-only"
+
+[project.optional-dependencies]
+bundle = ["PyNaCl>=1.5.0,<2", "zstandard>=0.23,<1"]
+test = ["pytest>=8,<10"]
+
+[project.scripts]
+rdheadless = "rdheadless.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["rdheadless*"]

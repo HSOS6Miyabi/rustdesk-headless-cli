@@ -1,0 +1,154 @@
+name: Build binaries and publish release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Verify source before publishing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install runtime and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[bundle,test]'
+      - name: Run private-mode protocol and relay tests
+        run: |
+          python -m pytest -q -p no:cacheprovider tests/test_host_e2e.py tests/test_file_ops.py tests/test_cli.py tests/test_rendezvous.py tests/test_relay_e2e.py tests/test_cross_platform_api.py
+      - name: Run PAM, public-mode and isolation tests
+        run: |
+          sudo env "PATH=$PATH" python -m pytest -q -p no:cacheprovider tests/test_auth.py tests/test_public_e2e.py
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: [test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux-amd64, runner: ubuntu-24.04, suffix: '', host: true }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm, suffix: '', host: true }
+          - { target: macos-amd64, runner: macos-15-intel, suffix: '', host: false }
+          - { target: macos-arm64, runner: macos-15, suffix: '', host: false }
+          - { target: windows-amd64, runner: windows-latest, suffix: '.exe', host: false }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install standalone binary build dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[bundle,test]'
+          python -m pip install 'pyinstaller>=6.11,<7'
+      - name: Bundle executable
+        shell: bash
+        env:
+          HOST: ${{ matrix.host }}
+        run: |
+          ARGS=(--noconfirm --clean --onefile --console --name rdheadless --collect-all nacl --collect-all zstandard)
+          if [[ "$HOST" == 'true' ]]; then
+            ARGS+=(--hidden-import rdheadless.worker --hidden-import rdheadless.exec_shell)
+          fi
+          python -m PyInstaller "${ARGS[@]}" rdheadless/__main__.py
+      - name: Check standalone executable help
+        shell: bash
+        env:
+          SUFFIX: ${{ matrix.suffix }}
+        run: |
+          ./dist/rdheadless${SUFFIX} --help
+      - name: Check Linux frozen host, worker, login and file transfer
+        if: matrix.host
+        shell: bash
+        run: |
+          python scripts/smoke_bundle.py ./dist/rdheadless
+      - name: Package executable and notices
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          SUFFIX: ${{ matrix.suffix }}
+        run: |
+          mkdir -p output staging/examples
+          cp dist/rdheadless${SUFFIX} staging/
+          cp README.md SECURITY.md NOTICE staging/
+          cp examples/*.toml staging/examples/
+          if [[ -f LICENSE ]]; then cp LICENSE staging/; fi
+          if [[ "$TARGET" == windows-* ]]; then
+            python -c "import shutil; shutil.make_archive('output/rdheadless-${TARGET}', 'zip', 'staging')"
+          else
+            tar -czf "output/rdheadless-${TARGET}.tar.gz" -C staging .
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: output/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish GitHub release
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          pattern: release-*
+          merge-multiple: true
+      - name: Check release version and prepare checksums
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release version'; exit 1; }
+          TAG="v${VERSION}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          (cd release && sha256sum rdheadless-*.zip rdheadless-*.tar.gz > SHA256SUMS)
+          ls -lh release/
+          git fetch --tags --force
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            TAG_SHA=$(git rev-list -n 1 "$TAG")
+            if [[ "$TAG_SHA" != "$GITHUB_SHA" ]]; then
+              echo "The version $TAG belongs to a different commit; increment pyproject.toml version."
+              exit 1
+            fi
+          fi
+      - name: Create tag and release after successful builds
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists at this commit."
+            exit 0
+          fi
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG" "$GITHUB_SHA"
+            git push origin "$TAG"
+          fi
+          gh release create "$TAG" release/* --title "RustDesk Headless CLI $TAG" --notes-file RELEASE_NOTES.md

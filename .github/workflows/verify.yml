@@ -1,0 +1,50 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-tests:
+    name: Linux protocol and PAM tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[bundle,test]'
+      - name: Test unprivileged connections and hbbs/hbbr simulation
+        run: |
+          python -m pytest -q -p no:cacheprovider tests/test_host_e2e.py tests/test_file_ops.py tests/test_cli.py tests/test_rendezvous.py tests/test_relay_e2e.py tests/test_cross_platform_api.py
+      - name: Test PAM authentication and user isolation as root
+        run: |
+          sudo env "PATH=$PATH" python -m pytest -q -p no:cacheprovider tests/test_auth.py tests/test_public_e2e.py
+
+  client-tests:
+    name: Client import and protocol tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -e '.[bundle,test]'
+      - run: python -m rdheadless --help
+      - run: python -m pytest -q -p no:cacheprovider tests/test_cross_platform_api.py
