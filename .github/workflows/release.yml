@@ -126,7 +126,7 @@ jobs:
           cp openwrt/*.sh openwrt/*.toml openwrt/*.init staging/rdheadless-openwrt/openwrt/
           cp README.md SECURITY.md LICENSE NOTICE staging/rdheadless-openwrt/
           tar -czf output/rdheadless-openwrt-source.tar.gz -C staging rdheadless-openwrt
-          tar -tzf output/rdheadless-openwrt-source.tar.gz | grep -q 'rdheadless-openwrt/openwrt/install.sh'
+          tar -tzf output/rdheadless-openwrt-source.tar.gz | grep -F 'rdheadless-openwrt/openwrt/install.sh'
       - uses: actions/upload-artifact@v4
         with:
           name: release-openwrt
