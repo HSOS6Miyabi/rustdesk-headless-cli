@@ -4,6 +4,10 @@ RustDesk Headless 提供 Linux 无图形界面的远程终端与文件传输服�
 
 项目提供私用模式和公用模式。私用模式直接使用服务进程所属账户的权限，也可以以 root 运行，适合 OpenWrt 等仅提供 root 账户的设备。公用模式通过 PAM 验证 Linux 账户，为验证成功的会话启动对应用户的独立进程。
 
+## 开发与交接文档
+
+维护人员请从 [交接文档索引](docs/README.md) 开始阅读。文档包含 [项目状态与开发台账](docs/PROJECT_LEDGER.md)、[架构说明](docs/ARCHITECTURE.md)、[协议兼容性](docs/PROTOCOL_COMPATIBILITY.md)、[认证与安全设计](docs/SECURITY_MODEL.md)、[开发测试](docs/DEVELOPMENT.md)、[部署运维](docs/OPERATIONS.md)、[发布流程](docs/RELEASING.md) 和 [交接检查表](docs/HANDOFF.md)。
+
 ## 已实现的功能
 
 | 功能 | 私用模式 | 公用模式 |

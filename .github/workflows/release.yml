@@ -3,6 +3,12 @@ name: Build binaries and publish release
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/verify.yml'
+      - 'scripts/check_docs.py'
   workflow_dispatch:
 
 permissions:
